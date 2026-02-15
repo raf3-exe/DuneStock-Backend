@@ -98,4 +98,15 @@ public class User {
     public void setOwnedWarehouses(List<Warehouse> ownedWarehouses) {
         this.ownedWarehouses = ownedWarehouses;
     }
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }
