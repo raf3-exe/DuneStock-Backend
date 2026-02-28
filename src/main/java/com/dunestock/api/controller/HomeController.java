@@ -105,6 +105,35 @@ public class HomeController {
             return ResponseEntity.status(500).body("สร้างไม่สำเร็จ: " + e.getMessage());
         }
     }
+    // GET /api/warehouses/{warehouseId}/products
+    @GetMapping("/warehouses/{warehouseId}/products")
+    public ResponseEntity<?> getProductsByWarehouse(@PathVariable String warehouseId) {
+        try {
+            Warehouse warehouse = warehouseRepository.findById(warehouseId).orElse(null);
+            if (warehouse == null) {
+                return ResponseEntity.status(404).body("ไม่พบโกดัง");
+            }
+
+            List<Map<String, Object>> result = new ArrayList<>();
+
+            if (warehouse.getProducts() != null) {
+                for (var product : warehouse.getProducts()) {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("product_id",    product.getProductId());
+                    map.put("product_name",  product.getProductName());
+                    map.put("quantity",      product.getQuantity());
+                    map.put("category_name", product.getCategory() != null
+                            ? product.getCategory().getCategoryName() : null);
+                    result.add(map);
+                }
+            }
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("เกิดข้อผิดพลาด: " + e.getMessage());
+        }
+    }
 
     @Transactional
     @DeleteMapping("/warehouses/{warehouseId}")
