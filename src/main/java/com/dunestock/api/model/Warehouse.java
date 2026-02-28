@@ -1,5 +1,6 @@
 package com.dunestock.api.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -24,6 +25,7 @@ public class Warehouse {
 
     // เชื่อมกับ Owner (User)
     @ManyToOne
+    @JsonIgnore
     @JoinColumn(name = "owner_id")
     private User owner;
 

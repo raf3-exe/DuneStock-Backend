@@ -1,5 +1,6 @@
 package com.dunestock.api.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -25,6 +26,7 @@ public class Product {
 
     // สินค้านี้อยู่ใน Warehouse ไหน
     @ManyToOne
+    @JsonIgnore
     @JoinColumn(name = "warehouse_id")
     private Warehouse warehouse;
 
