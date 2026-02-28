@@ -21,7 +21,7 @@ public class ProductController {
         this.productRepository = productRepository;
     }
 
-    // สร้าง Method ช่วยแปลง Product เป็น Map (JSON แบบสร้างเอง) เพื่อตัดปัญหาการวนลูป
+    // 🌟 Method แปลงข้อมูลส่งให้ Android
     private Map<String, Object> convertToMap(Product product) {
         Map<String, Object> map = new HashMap<>();
         map.put("productId", product.getProductId());
@@ -30,14 +30,20 @@ public class ProductController {
         map.put("quantity", product.getQuantity());
         map.put("createdAt", product.getCreatedAt());
 
-        // ดึงแค่ข้อมูล String ออกมาส่งกลับไป ไม่ส่งไปเป็น Object
+        // 🌟 1. จัด Category เป็น Object เพื่อให้ Android โชว์ประเภทสินค้าได้
         if (product.getCategory() != null) {
-            map.put("categoryId", product.getCategory().getCategoryId());
-            map.put("categoryName", product.getCategory().getCategoryName());
+            Map<String, Object> catMap = new HashMap<>();
+            catMap.put("categoryId", product.getCategory().getCategoryId());
+            catMap.put("categoryName", product.getCategory().getCategoryName());
+            map.put("category", catMap);
         }
-        if (product.getWarehouse() != null) {
-            map.put("warehouseId", product.getWarehouse().getWarehouseId());
-        }
+
+        // 🌟 2. จำลองข้อมูล Warehouse ส่งกลับไปให้ Android ชั่วคราว (กันแอปฝั่งนู้นพัง)
+        Map<String, Object> whMap = new HashMap<>();
+        whMap.put("warehouseId", "W001");
+        whMap.put("warehousesDetail", "โกดังหลัก (จำลอง)");
+        map.put("warehouse", whMap);
+
         return map;
     }
 
@@ -52,10 +58,12 @@ public class ProductController {
 
     @PostMapping("/newProduct")
     public ResponseEntity<Map<String, Object>> createProduct(@RequestBody Product product) {
-        // 1. เซฟลง Database ตามปกติ (เซฟด้วย Object Model แบบเดิม)
+        // 🌟 3. สำคัญมาก! เคลียร์ค่า Warehouse ทิ้งก่อนเซฟลง Database
+        // เพื่อไม่ให้ Hibernate วิ่งไปหาโกดัง W001 ที่ยังไม่มีอยู่จริง แล้วเกิด Error 500
+        product.setWarehouse(null);
+
         Product savedProduct = productRepository.save(product);
 
-        // 2. จับมาใส่ Map เพื่อเลือกส่งแค่ข้อความแบนๆ กลับไปให้ Android
         Map<String, Object> response = convertToMap(savedProduct);
         return ResponseEntity.ok(response);
     }
@@ -64,15 +72,18 @@ public class ProductController {
     public ResponseEntity<Map<String, String>> updateProduct(@PathVariable String id, @RequestBody Product productDetails) {
         return productRepository.findById(id)
                 .map(product -> {
-                    // ถ้าเจอ ให้เอาข้อมูลใหม่มาทับข้อมูลเดิม
                     product.setProductName(productDetails.getProductName());
                     product.setQuantity(productDetails.getQuantity());
-                    product.setCategory(productDetails.getCategory());
 
-                    // บันทึกการเปลี่ยนแปลงลง Database
+                    // อัปเดต Category
+                    if (productDetails.getCategory() != null) {
+                        product.setCategory(productDetails.getCategory());
+                    }
+
+                    // 🌟 ไม่ต้องอัปเดต Warehouse ปล่อยผ่านไปก่อน
+
                     productRepository.save(product);
 
-                    // 🌟 แก้ไขตรงนี้: ไม่ส่ง Object Product กลับไปแล้ว ส่งแค่ข้อความบอกว่าผ่านก็พอ!
                     Map<String, String> response = new HashMap<>();
                     response.put("status", "success");
                     response.put("message", "อัปเดตข้อมูลสำเร็จ");
@@ -82,16 +93,13 @@ public class ProductController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // 🌟 เพิ่มคำสั่งนี้สำหรับการลบสินค้า
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<?> deleteProduct(@PathVariable String id) {
-        // เช็คก่อนว่ามีสินค้านี้อยู่ใน Database ไหม
         if (productRepository.existsById(id)) {
-            // ถ้ามี สั่งลบเลย
             productRepository.deleteById(id);
-            return ResponseEntity.ok().build(); // ส่งสถานะ 200 OK กลับไปว่าลบสำเร็จ
+            return ResponseEntity.ok().build();
         } else {
-            return ResponseEntity.notFound().build(); // ถ้าไม่เจอส่ง 404
+            return ResponseEntity.notFound().build();
         }
     }
 }
