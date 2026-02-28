@@ -27,14 +27,11 @@ public class Warehouse {
     @JoinColumn(name = "owner_id")
     private User owner;
 
-    // Warehouse มีหลาย Category
-    @OneToMany(mappedBy = "warehouse")
+    @OneToMany(mappedBy = "warehouse", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Category> categories;
 
-    // Warehouse มีหลาย Product
-    @OneToMany(mappedBy = "warehouse")
+    @OneToMany(mappedBy = "warehouse", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Product> products;
-
     public String getWarehouseId() {
         return warehouseId;
     }
