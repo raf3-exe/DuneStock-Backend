@@ -1,7 +1,12 @@
+
 package com.dunestock.api.controller;
 
 import com.dunestock.api.model.Product;
 import com.dunestock.api.repository.ProductRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -48,11 +53,30 @@ public class ProductController {
     }
 
     @GetMapping("/showAll")
-    public ResponseEntity<List<Map<String, Object>>> getAllProducts() {
-        List<Product> products = productRepository.findAll();
-        List<Map<String, Object>> response = products.stream()
+    public ResponseEntity<Map<String, Object>> getAllProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String warehouseId) { // 🌟 เพิ่ม Parameter กรองโกดัง
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("productId").ascending());
+        Page<Product> productPage;
+
+        // 🌟 เช็กว่ามีการส่ง warehouseId มาหรือไม่
+        if (warehouseId != null && !warehouseId.isEmpty()) {
+            productPage = productRepository.findByWarehouse_WarehouseId(warehouseId, pageable);
+        } else {
+            productPage = productRepository.findAll(pageable);
+        }
+
+        List<Map<String, Object>> products = productPage.getContent().stream()
                 .map(this::convertToMap)
                 .collect(Collectors.toList());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("products", products);
+        response.put("currentPage", productPage.getNumber() + 1);
+        response.put("totalPages", productPage.getTotalPages());
+
         return ResponseEntity.ok(response);
     }
 
