@@ -32,17 +32,20 @@ public class HomeController {
     @Autowired
     private UserRepository userRepository;
 
+
+
     @GetMapping("/warehouses")
     public ResponseEntity<?> getWarehouses(@RequestParam String userId) {
         List<Warehouse> warehouses = warehouseRepository.findByOwnerUserId(userId);
         List<Map<String, Object>> result = new ArrayList<>();
         for (Warehouse w : warehouses) {
             Map<String, Object> map = new HashMap<>();
-            map.put("warehouse_id", w.getWarehouseId());
-            map.put("warehouse_name", w.getWarehouseName());
+            map.put("warehouse_id",      w.getWarehouseId());
+            map.put("warehouse_name",    w.getWarehouseName());
             map.put("warehouses_detail", w.getWarehouseDetail() != null ? w.getWarehouseDetail() : "");
-            map.put("create_at", w.getCreatedAt() != null ? w.getCreatedAt().toString() : "");
-            map.put("owner_id", w.getOwner().getUserId());
+            map.put("create_at",         w.getCreatedAt() != null ? w.getCreatedAt().toString() : "");
+            map.put("owner_id",          w.getOwner().getUserId());
+            map.put("owner_username",    w.getOwner().getUsername()); // ✅ เพิ่มต่อจากบรรทัดนี้
             result.add(map);
         }
         return ResponseEntity.ok(result);
@@ -130,6 +133,26 @@ public class HomeController {
 
             return ResponseEntity.ok(result);
 
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("เกิดข้อผิดพลาด: " + e.getMessage());
+        }
+    }
+    // GET /api/users/{userId}
+    @GetMapping("/users/{userId}")
+    public ResponseEntity<?> getUserById(@PathVariable String userId) {
+        try {
+            User user = userRepository.findById(userId).orElse(null);
+            if (user == null) return ResponseEntity.status(404).body("ไม่พบผู้ใช้");
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("user_id",   user.getUserId());
+            result.put("username",  user.getUsername());
+            result.put("email",     user.getEmail());
+            result.put("create_at", user.getCreatedAt() != null ? user.getCreatedAt().toString() : "");
+            result.put("update_at", user.getUpdatedAt() != null ? user.getUpdatedAt().toString() : "");
+            result.put("delete_at", user.getDeletedAt() != null ? user.getDeletedAt().toString() : "");
+
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.status(500).body("เกิดข้อผิดพลาด: " + e.getMessage());
         }
