@@ -7,5 +7,6 @@ import java.util.List;
 public interface ProductRepository extends JpaRepository<Product, String> {
 
     List<Product> findByWarehouseWarehouseId(String warehouseId);
+    
 
 }
