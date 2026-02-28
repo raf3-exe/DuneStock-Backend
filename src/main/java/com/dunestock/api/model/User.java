@@ -3,8 +3,11 @@ package com.dunestock.api.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
+import org.springframework.data.jpa.repository.JpaRepository;
+
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Data
 @Entity
@@ -35,6 +38,11 @@ public class User {
     // ความสัมพันธ์: User เป็นเจ้าของ Warehouse
     @OneToMany(mappedBy = "owner")
     private List<Warehouse> ownedWarehouses;
+
+    public interface UserRepository extends JpaRepository<User, String> {
+        Optional<User> findByUsername(String username);
+        Optional<User> findByEmail(String email);
+    }
 
     public String getUserId() {
         return userId;

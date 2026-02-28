@@ -9,6 +9,7 @@ import java.util.List;
 @Entity
 @Table(name = "categories")
 public class Category {
+
     @Id
     @Column(name = "category_id", length = 5)
     private String categoryId;
