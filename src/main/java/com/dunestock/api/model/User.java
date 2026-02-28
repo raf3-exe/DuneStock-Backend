@@ -1,5 +1,6 @@
 package com.dunestock.api.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -109,4 +110,11 @@ public class User {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+
+
+
+    @OneToMany(mappedBy = "user")
+    @JsonIgnore
+    private List<Membership> memberships; // username
 }
