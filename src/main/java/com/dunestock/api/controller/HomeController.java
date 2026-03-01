@@ -1,15 +1,17 @@
 package com.dunestock.api.controller;
 
+import com.dunestock.api.model.Membership;
 import com.dunestock.api.model.StockHistory;
 import com.dunestock.api.model.User;
 import com.dunestock.api.model.Warehouse;
+import com.dunestock.api.repository.MembershipRepository;
 import com.dunestock.api.repository.StockHistoryRepository;
 import com.dunestock.api.repository.UserRepository;
 import com.dunestock.api.repository.WarehouseRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -31,6 +33,8 @@ public class HomeController {
 
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private MembershipRepository membershipRepository;
 
 
 
@@ -69,22 +73,18 @@ public class HomeController {
         }
         return ResponseEntity.ok(result);
     }
-
-    // POST /api/warehouses
     @PostMapping("/warehouses")
     public ResponseEntity<?> createWarehouse(@RequestBody Map<String, String> body) {
         try {
-            String ownerId = body.get("owner_id");
-            String whName = body.get("warehouse_name");
+            String ownerId  = body.get("owner_id");
+            String whName   = body.get("warehouse_name");
             String whDetail = body.get("warehouses_detail");
 
-            // หา User จาก owner_id
             User owner = userRepository.findById(ownerId).orElse(null);
             if (owner == null) {
                 return ResponseEntity.status(404).body("ไม่พบผู้ใช้ id: " + ownerId);
             }
 
-            // สร้าง Warehouse ใหม่
             Warehouse warehouse = new Warehouse();
             warehouse.setWarehouseId("W" + UUID.randomUUID().toString().substring(0, 4).toUpperCase());
             warehouse.setWarehouseName(whName);
@@ -94,13 +94,25 @@ public class HomeController {
 
             Warehouse saved = warehouseRepository.save(warehouse);
 
-            // ส่งกลับ format เดียวกับ getWarehouses
+            // ✅ เพิ่มตรงนี้
+            Membership.MembershipId membershipId = new Membership.MembershipId(
+                    ownerId,
+                    saved.getWarehouseId()
+            );
+            Membership membership = new Membership();
+            membership.setId(membershipId);
+            membership.setUser(owner);
+            membership.setWarehouse(saved);
+            membership.setRole(Membership.Role.O);
+            membershipRepository.save(membership);
+
             Map<String, Object> result = new HashMap<>();
-            result.put("warehouse_id", saved.getWarehouseId());
-            result.put("warehouse_name", saved.getWarehouseName());
+            result.put("warehouse_id",      saved.getWarehouseId());
+            result.put("warehouse_name",    saved.getWarehouseName());
             result.put("warehouses_detail", saved.getWarehouseDetail() != null ? saved.getWarehouseDetail() : "");
-            result.put("create_at", saved.getCreatedAt().toString());
-            result.put("owner_id", saved.getOwner().getUserId());
+            result.put("create_at",         saved.getCreatedAt().toString());
+            result.put("owner_id",          saved.getOwner().getUserId());
+            result.put("owner_username",    saved.getOwner().getUsername());
 
             return ResponseEntity.ok(result);
 
@@ -108,7 +120,6 @@ public class HomeController {
             return ResponseEntity.status(500).body("สร้างไม่สำเร็จ: " + e.getMessage());
         }
     }
-
     // =========================================================
     // 🌟 แก้ไขฟังก์ชันนี้ เพื่อส่งข้อมูลให้ทั้งคุณและเพื่อนใช้งานได้
     // =========================================================
