@@ -26,19 +26,23 @@ public class Warehouse {
     @Column(name = "create_at")
     private LocalDateTime createdAt;
 
-    // เชื่อมกับ Owner (User)
     @ManyToOne
     @JoinColumn(name = "owner_id")
     @JsonIgnore
     private User owner;
 
-    @OneToMany(mappedBy = "warehouse", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonIgnoreProperties("warehouse")
-    private List<Category> categories;
-
-    @OneToMany(mappedBy = "warehouse", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "warehouse")
     @JsonIgnoreProperties("warehouse")
     private List<Product> products;
+
+    // เพิ่มตรงนี้: เพื่อให้ Warehouse รู้ว่าตัวเองมีประวัติอะไรบ้าง
+    @OneToMany(mappedBy = "warehouse")
+    @JsonIgnoreProperties("warehouse")
+    private List<StockHistory> stockHistories;
+
+    @OneToMany(mappedBy = "warehouse")
+    @JsonIgnoreProperties("warehouse")
+    private List<Category> categories;
 
     public String getWarehouseId() {
         return warehouseId;

@@ -1,5 +1,7 @@
 package com.dunestock.api.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -14,23 +16,38 @@ public class StockHistory {
 
     @Enumerated(EnumType.STRING)
     @Column(columnDefinition = "ENUM('IN', 'OUT')")
-    private StockType type; // ต้องสร้าง Enum แยกหรือใส่ไว้ในไฟล์เดียวกัน
+    private StockType type;
 
     private int amount;
 
     @Column(name = "create_at")
     private LocalDateTime createdAt;
 
+    // 1. เชื่อมกับ Product (ดูว่าสินค้าชิ้นไหน)
     @ManyToOne
     @JoinColumn(name = "product_id")
+    @JsonIgnoreProperties({"warehouse", "category"}) // ไม่ต้องดึงซ้ำซ้อน
     private Product product;
 
+    // 2. เชื่อมกับ Warehouse (จุดที่คุณต้องการเพิ่ม!)
+    @ManyToOne
+    @JoinColumn(name = "warehouse_id")
+    @JsonIgnoreProperties({"products", "categories", "owner"})
+    private Warehouse warehouse;
+
+    // 3. เชื่อมกับ User (ดูว่าใครเป็นคนกดยืนยัน)
     @ManyToOne
     @JoinColumn(name = "user_id")
+    @JsonIgnore // ปกติประวัติไม่ต้องโชว์ข้อมูล User แบบละเอียด
     private User user;
 
     public enum StockType {
         IN, OUT
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
     }
 
     public String getStockHistoryId() {

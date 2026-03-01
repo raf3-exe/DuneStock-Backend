@@ -1,6 +1,7 @@
 package com.dunestock.api.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -16,23 +17,26 @@ public class Product {
     @Column(name = "product_name", length = 150)
     private String productName;
 
-    @Column(length = 50)
     private String sku;
-
     private int quantity;
 
     @Column(name = "create_at")
     private LocalDateTime createdAt;
 
-    // สินค้านี้อยู่ใน Warehouse ไหน
     @ManyToOne
     @JoinColumn(name = "warehouse_id")
+    @JsonIgnoreProperties({"products", "categories", "stockHistories"})
     private Warehouse warehouse;
 
-    // สินค้านี้หมวดหมู่ไหน
     @ManyToOne
     @JoinColumn(name = "category_id")
+    @JsonIgnoreProperties("warehouse")
     private Category category;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
 
     public String getProductId() {
         return productId;
