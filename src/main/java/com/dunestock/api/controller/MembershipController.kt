@@ -71,11 +71,33 @@ class MembershipController(
 
     data class WarehouseResponse(val warehouseId: String)
 
-    @GetMapping("memberships/my-warehouse/{userId}")
+    @GetMapping("/my-warehouse/{userId}")
     fun getMyWarehouse(@PathVariable userId: String): ResponseEntity<WarehouseResponse> {
-        val membership = membershipRepository.findAll().firstOrNull { it.user.userId == userId }
-            ?: return ResponseEntity.notFound().build()
-        return ResponseEntity.ok(WarehouseResponse(membership.warehouse.warehouseId))
+
+        // 💡 1. ดึงข้อมูล User ขึ้นมาก่อน (ใช้ userRepository ที่มีอยู่แล้ว)
+        val userOptional = userRepository.findById(userId)
+
+        if (userOptional.isPresent) {
+            val user = userOptional.get()
+
+            // เช็คว่า User คนนี้เป็น "เจ้าของ" โกดังไหนไหม? (ดึงจาก List ในโมเดล User ได้เลย)
+            val ownedWarehouses = user.ownedWarehouses
+            if (!ownedWarehouses.isNullOrEmpty()) {
+                val ownerWarehouseId = ownedWarehouses[0].warehouseId
+                return ResponseEntity.ok(WarehouseResponse(ownerWarehouseId))
+            }
+        }
+
+        // 💡 2. ถ้าไม่ได้เป็นเจ้าของ ค่อยมาหาว่าเป็น "พนักงาน (Member)" ในโกดังไหน?
+        val memberships = membershipRepository.findByUserUserId(userId)
+
+        if (memberships.isNotEmpty()) {
+            val memberWarehouseId = memberships[0].warehouse.warehouseId
+            return ResponseEntity.ok(WarehouseResponse(memberWarehouseId))
+        }
+
+        // 3. ถ้าไม่เป็นทั้งเจ้าของและไม่ได้เป็นพนักงาน คืนค่า 404 (ไม่พบข้อมูล)
+        return ResponseEntity.notFound().build()
     }
 
 
