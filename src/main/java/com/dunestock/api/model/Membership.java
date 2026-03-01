@@ -34,7 +34,7 @@ public class Membership {
 
 
     @Enumerated(EnumType.STRING)
-    @Column(columnDefinition = "ENUM('O','E','V')")
+    @Column(columnDefinition = "ENUM('O','E','V','W')")
     private Role role;
 
     @Column(name = "create_at")
@@ -46,7 +46,7 @@ public class Membership {
     }
 
     public enum Role {
-        O, E, V
+        O, E, V,W
     }
 
     // ==========================

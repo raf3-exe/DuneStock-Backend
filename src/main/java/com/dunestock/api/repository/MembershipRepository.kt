@@ -1,7 +1,6 @@
 package com.dunestock.api.repository
 
 import com.dunestock.api.model.Membership
-import com.dunestock.api.model.Membership.MembershipId
 import com.dunestock.api.model.Warehouse
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.stereotype.Repository
@@ -21,6 +20,8 @@ interface MembershipRepository : JpaRepository<Membership, Membership.Membership
         // เพิ่มคำสั่งนี้เพื่อหาว่า User คนนี้เป็นเจ้าของโกดังไหน
         fun findByOwnerUserId(userId: String): List<Warehouse>
     }
+
+    fun findByUserUserIdAndRole(userId: String?, role: Membership.Role?): MutableList<Membership?>?
 
 }
 
