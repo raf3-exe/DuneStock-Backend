@@ -1,6 +1,6 @@
 package com.dunestock.api.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -11,6 +11,7 @@ import java.util.List;
 @Table(name = "warehouses")
 public class Warehouse {
     @Id
+    @JsonProperty("warehouseId")
     @Column(name = "warehouse_id", length = 5)
     private String warehouseId;
 
@@ -25,7 +26,6 @@ public class Warehouse {
 
     // เชื่อมกับ Owner (User)
     @ManyToOne
-    @JsonIgnore
     @JoinColumn(name = "owner_id")
     private User owner;
 

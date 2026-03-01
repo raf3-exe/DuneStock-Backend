@@ -108,6 +108,10 @@ public class HomeController {
             return ResponseEntity.status(500).body("สร้างไม่สำเร็จ: " + e.getMessage());
         }
     }
+
+    // =========================================================
+    // 🌟 แก้ไขฟังก์ชันนี้ เพื่อส่งข้อมูลให้ทั้งคุณและเพื่อนใช้งานได้
+    // =========================================================
     // GET /api/warehouses/{warehouseId}/products
     @GetMapping("/warehouses/{warehouseId}/products")
     public ResponseEntity<?> getProductsByWarehouse(@PathVariable String warehouseId) {
@@ -122,11 +126,35 @@ public class HomeController {
             if (warehouse.getProducts() != null) {
                 for (var product : warehouse.getProducts()) {
                     Map<String, Object> map = new HashMap<>();
+
+                    // ------------------------------------------
+                    // 🧑‍💻 1. ชุดข้อมูลสำหรับแอปของ "เพื่อนคุณ" (มี _)
+                    // ------------------------------------------
                     map.put("product_id",    product.getProductId());
-                    map.put("product_name",  product.getProductName());
+                    map.put("product_name",  product.getProductName() != null ? product.getProductName() : "");
+                    map.put("category_name", product.getCategory() != null ? product.getCategory().getCategoryName() : null);
+
+                    // ------------------------------------------
+                    // 🙋‍♂️ 2. ชุดข้อมูลสำหรับแอปของ "คุณ" (CamelCase)
+                    // ------------------------------------------
+                    map.put("productId",     product.getProductId());
+                    map.put("productName",   product.getProductName() != null ? product.getProductName() : "");
+                    map.put("sku",           product.getSku() != null ? product.getSku() : "");
+                    map.put("createdAt",     product.getCreatedAt() != null ? product.getCreatedAt().toString() : "");
+
+                    // สร้างโครงสร้าง Category Object เพื่อแอปของคุณ
+                    if (product.getCategory() != null) {
+                        Map<String, Object> catMap = new HashMap<>();
+                        catMap.put("categoryId", product.getCategory().getCategoryId());
+                        catMap.put("categoryName", product.getCategory().getCategoryName());
+                        map.put("category", catMap);
+                    }
+
+                    // ------------------------------------------
+                    // 🤝 3. ข้อมูลที่ใช้ร่วมกันได้ (ชื่อเหมือนกัน)
+                    // ------------------------------------------
                     map.put("quantity",      product.getQuantity());
-                    map.put("category_name", product.getCategory() != null
-                            ? product.getCategory().getCategoryName() : null);
+
                     result.add(map);
                 }
             }
@@ -137,6 +165,7 @@ public class HomeController {
             return ResponseEntity.status(500).body("เกิดข้อผิดพลาด: " + e.getMessage());
         }
     }
+
     // GET /api/users/{userId}
     @GetMapping("/users/{userId}")
     public ResponseEntity<?> getUserById(@PathVariable String userId) {

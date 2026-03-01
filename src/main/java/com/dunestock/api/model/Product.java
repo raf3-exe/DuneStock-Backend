@@ -26,7 +26,6 @@ public class Product {
 
     // สินค้านี้อยู่ใน Warehouse ไหน
     @ManyToOne
-    @JsonIgnore
     @JoinColumn(name = "warehouse_id")
     private Warehouse warehouse;
 
