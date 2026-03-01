@@ -30,6 +30,7 @@ public class Membership {
     @ManyToOne
     @MapsId("warehouseId")
     @JoinColumn(name = "warehouse_id")
+    @JsonIgnoreProperties({"categories", "products"})
     private Warehouse warehouse;
 
 
@@ -46,7 +47,7 @@ public class Membership {
     }
 
     public enum Role {
-        O, E, V,W
+        O, E, V, W
     }
 
     // ==========================

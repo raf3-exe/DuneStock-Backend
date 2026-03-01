@@ -1,6 +1,7 @@
 package com.dunestock.api.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -37,7 +38,7 @@ public class User {
 
     // ความสัมพันธ์: User เป็นเจ้าของ Warehouse
     @OneToMany(mappedBy = "owner")
-    @JsonIgnore
+    @JsonIgnoreProperties("owner")
     private List<Warehouse> ownedWarehouses;
 
     public interface UserRepository extends JpaRepository<User, String> {
@@ -120,7 +121,7 @@ public class User {
         updatedAt = LocalDateTime.now();
     }
 
-    @OneToMany(mappedBy = "user")
-    @JsonIgnore
+    @OneToMany(mappedBy = "user", fetch = FetchType.EAGER) // ใช้ EAGER เพื่อให้ดึงทันที
+    @JsonIgnoreProperties("user") // 👈 เปลี่ยนจาก @JsonIgnore เป็นตัวนี้
     private List<Membership> memberships; // username
 }
