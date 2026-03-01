@@ -37,6 +37,7 @@ public class User {
 
     // ความสัมพันธ์: User เป็นเจ้าของ Warehouse
     @OneToMany(mappedBy = "owner")
+    @JsonIgnore
     private List<Warehouse> ownedWarehouses;
 
     public interface UserRepository extends JpaRepository<User, String> {
@@ -118,9 +119,6 @@ public class User {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
-
-
-
 
     @OneToMany(mappedBy = "user")
     @JsonIgnore
