@@ -9,4 +9,6 @@ import java.util.List;
 @Repository
 public interface StockHistoryRepository extends JpaRepository<StockHistory, String> {
     List<StockHistory> findByUserUserId(String userId);
+
+
 }

@@ -1,11 +1,7 @@
 package com.dunestock.api.controller;
 
-import com.dunestock.api.model.Category;
-import com.dunestock.api.model.Product;
-import com.dunestock.api.model.Warehouse;
-import com.dunestock.api.repository.CategoryRepository;
-import com.dunestock.api.repository.ProductRepository;
-import com.dunestock.api.repository.WarehouseRepository;
+import com.dunestock.api.model.*;
+import com.dunestock.api.repository.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -25,26 +21,52 @@ import java.util.stream.Collectors;
 public class ProductController {
 
     private final ProductRepository productRepository;
-    private final WarehouseRepository warehouseRepository; // 🌟 เพิ่มตัวช่วยค้นหาโกดัง
-    private final CategoryRepository categoryRepository;   // 🌟 เพิ่มตัวช่วยค้นหาหมวดหมู่
+    private final WarehouseRepository warehouseRepository;
+    private final CategoryRepository categoryRepository;
+    private final StockHistoryRepository stockHistoryRepository;
+    private final UserRepository userRepository; // 🌟 1. เพิ่มตัวช่วยค้นหา User
 
-    // 🌟 อัปเดต Constructor ให้รับ Repository เข้ามาให้ครบ
     public ProductController(ProductRepository productRepository,
                              WarehouseRepository warehouseRepository,
-                             CategoryRepository categoryRepository) {
+                             CategoryRepository categoryRepository,
+                             StockHistoryRepository stockHistoryRepository,
+                             UserRepository userRepository) { // 🌟 รับ UserRepository
         this.productRepository = productRepository;
         this.warehouseRepository = warehouseRepository;
         this.categoryRepository = categoryRepository;
+        this.stockHistoryRepository = stockHistoryRepository;
+        this.userRepository = userRepository;
     }
 
-    // Method แปลงข้อมูลส่งให้ Android (คงไว้เหมือนเดิม)
+    // 🌟 2. อัปเดตฟังก์ชันบันทึกประวัติให้รับ userId
+    private void recordStockHistory(Product product, Warehouse warehouse, int amount, StockHistory.StockType type, String userId) {
+        if (amount <= 0) return;
+
+        StockHistory history = new StockHistory();
+        long count = stockHistoryRepository.count();
+        history.setStockHistoryId(String.format("SH%03d", count + 1));
+        history.setProduct(product);
+        history.setWarehouse(warehouse);
+        history.setAmount(amount);
+        history.setType(type);
+
+        // 🌟 3. ค้นหา User จาก ID ที่ส่งมาและผูกกับประวัติ
+        if (userId != null && !userId.isEmpty()) {
+            User user = userRepository.findById(userId).orElse(null);
+            history.setUser(user);
+        }
+
+        stockHistoryRepository.save(history);
+        System.out.println("✅ บันทึกประวัติสำเร็จ: " + type + " จำนวน " + amount + " โดย User: " + userId);
+    }
+
+    // Method แปลงข้อมูล (คงเดิม)
     private Map<String, Object> convertToMap(Product product) {
         Map<String, Object> map = new HashMap<>();
         map.put("productId", product.getProductId());
         map.put("productName", product.getProductName());
         map.put("sku", product.getSku());
         map.put("quantity", product.getQuantity());
-        // แปลง LocalDateTime เป็น String เพื่อให้ Android ไม่งง
         map.put("createdAt", product.getCreatedAt() != null ? product.getCreatedAt().toString() : "");
 
         if (product.getCategory() != null) {
@@ -56,7 +78,6 @@ public class ProductController {
 
         if (product.getWarehouse() != null) {
             Map<String, Object> whMap = new HashMap<>();
-            // 🚨 สำคัญ: ชื่อ key "warehouseId" ต้องตรงกับ @SerializedName ใน Android
             whMap.put("warehouseId", product.getWarehouse().getWarehouseId());
             whMap.put("warehouseName", product.getWarehouse().getWarehouseName());
             map.put("warehouse", whMap);
@@ -91,10 +112,10 @@ public class ProductController {
         return ResponseEntity.ok(response);
     }
 
+    // 🌟 4. รับค่า userId ตอนเพิ่มสินค้า
     @PostMapping("/newProduct")
-    public ResponseEntity<?> createProduct(@RequestBody Product productRequest) {
+    public ResponseEntity<?> createProduct(@RequestBody Product productRequest, @RequestParam(required = false) String userId) {
         try {
-            // 1. สร้างรหัส PXXXX (ส่วนนี้ถูกแล้ว)
             List<Product> all = productRepository.findAll();
             int maxNum = all.stream()
                     .map(p -> p.getProductId().replaceAll("[^0-9]", ""))
@@ -103,31 +124,14 @@ public class ProductController {
                     .max().orElse(0);
             productRequest.setProductId(String.format("P%04d", maxNum + 1));
 
-            // 🌟 2. ส่วนดึงโกดังที่สำคัญที่สุด
-            System.out.println("====== เริ่มขั้นตอนตรวจสอบโกดัง ======");
-            if (productRequest.getWarehouse() == null) {
-                System.out.println("🚨 ข้อผิดพลาด: Android ไม่ได้ส่งข้อมูลโกดังมาเลย (Warehouse Object is null)");
-            } else {
+            if (productRequest.getWarehouse() != null) {
                 String whId = productRequest.getWarehouse().getWarehouseId();
-                System.out.println("🔍 รหัสโกดังที่ Android ส่งมาคือ: [" + whId + "]");
-
                 if (whId != null && !whId.isEmpty()) {
                     Warehouse realWh = warehouseRepository.findById(whId).orElse(null);
-                    if (realWh != null) {
-                        productRequest.setWarehouse(realWh);
-                        System.out.println("✅ ผูกโกดังกับสินค้าสำเร็จ!");
-                    } else {
-                        System.out.println("🚨 ข้อผิดพลาด: หาโกดังรหัส [" + whId + "] ไม่เจอใน Database!");
-                        // ถ้าหาไม่เจอ ให้เคลียร์ทิ้งไปเลย จะได้ไม่เป็น Null แบบงงๆ
-                        productRequest.setWarehouse(null);
-                    }
-                } else {
-                    System.out.println("🚨 ข้อผิดพลาด: Android ส่งโกดังมา แต่รหัสโกดังเป็น Null หรือค่าว่าง!");
+                    productRequest.setWarehouse(realWh);
                 }
             }
-            System.out.println("======================================");
 
-            // 3. จัดการหมวดหมู่
             if (productRequest.getCategory() != null && productRequest.getCategory().getCategoryId() != null) {
                 String catId = productRequest.getCategory().getCategoryId();
                 Category realCat = categoryRepository.findById(catId).orElse(null);
@@ -137,34 +141,55 @@ public class ProductController {
             productRequest.setCreatedAt(LocalDateTime.now());
             Product saved = productRepository.save(productRequest);
 
+            // 🌟 ส่ง userId เข้าไปบันทึกด้วย
+            recordStockHistory(saved, saved.getWarehouse(), saved.getQuantity(), StockHistory.StockType.IN, userId);
+
             return ResponseEntity.ok(convertToMap(saved));
 
         } catch (Exception e) {
-            System.out.println("🚨 เกิดข้อผิดพลาดร้ายแรง: " + e.getMessage());
             return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
         }
     }
+
+    // 🌟 5. รับค่า userId ตอนอัปเดตสินค้า
     @PutMapping("/updateProduct/{id}")
-    public ResponseEntity<Map<String, String>> updateProduct(@PathVariable String id, @RequestBody Product productDetails) {
-        return productRepository.findById(id)
-                .map(product -> {
-                    product.setProductName(productDetails.getProductName());
-                    product.setQuantity(productDetails.getQuantity());
+    public ResponseEntity<?> updateProduct(@PathVariable String id, @RequestBody Product productDetails, @RequestParam(required = false) String userId) {
+        try {
+            Product existingProduct = productRepository.findById(id).orElse(null);
+            if (existingProduct == null) {
+                return ResponseEntity.notFound().build();
+            }
 
-                    if (productDetails.getCategory() != null && productDetails.getCategory().getCategoryId() != null) {
-                        Category realCategory = categoryRepository.findById(productDetails.getCategory().getCategoryId()).orElse(null);
-                        product.setCategory(realCategory);
-                    }
+            int oldQty = existingProduct.getQuantity();
+            int newQty = productDetails.getQuantity();
+            int diff = newQty - oldQty;
 
-                    productRepository.save(product);
+            existingProduct.setProductName(productDetails.getProductName());
+            existingProduct.setQuantity(newQty);
 
-                    Map<String, String> response = new HashMap<>();
-                    response.put("status", "success");
-                    response.put("message", "อัปเดตข้อมูลสำเร็จ");
+            if (productDetails.getCategory() != null && productDetails.getCategory().getCategoryId() != null) {
+                Category realCategory = categoryRepository.findById(productDetails.getCategory().getCategoryId()).orElse(null);
+                existingProduct.setCategory(realCategory);
+            }
 
-                    return ResponseEntity.ok(response);
-                })
-                .orElse(ResponseEntity.notFound().build());
+            Product saved = productRepository.save(existingProduct);
+
+            // 🌟 ส่ง userId เข้าไปบันทึกด้วย
+            if (diff > 0) {
+                recordStockHistory(saved, saved.getWarehouse(), diff, StockHistory.StockType.IN, userId);
+            } else if (diff < 0) {
+                recordStockHistory(saved, saved.getWarehouse(), Math.abs(diff), StockHistory.StockType.OUT, userId);
+            }
+
+            Map<String, String> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "อัปเดตข้อมูลสำเร็จ");
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
+        }
     }
 
     @DeleteMapping("/delete/{id}")
