@@ -33,11 +33,11 @@ public class HomeController {
 
     @Autowired
     private UserRepository userRepository;
+
     @Autowired
     private MembershipRepository membershipRepository;
 
-
-
+    // GET /api/warehouses
     @GetMapping("/warehouses")
     public ResponseEntity<?> getWarehouses(@RequestParam String userId) {
         List<Warehouse> warehouses = warehouseRepository.findByOwnerUserId(userId);
@@ -49,12 +49,13 @@ public class HomeController {
             map.put("warehouses_detail", w.getWarehouseDetail() != null ? w.getWarehouseDetail() : "");
             map.put("create_at",         w.getCreatedAt() != null ? w.getCreatedAt().toString() : "");
             map.put("owner_id",          w.getOwner().getUserId());
-            map.put("owner_username",    w.getOwner().getUsername()); // ✅ เพิ่มต่อจากบรรทัดนี้
+            map.put("owner_username",    w.getOwner().getUsername());
             result.add(map);
         }
         return ResponseEntity.ok(result);
     }
 
+    // GET /api/stock-history
     @GetMapping("/stock-history")
     public ResponseEntity<?> getStockHistory(@RequestParam String userId) {
         List<StockHistory> historyList = stockHistoryRepository.findByUserUserId(userId);
@@ -62,17 +63,19 @@ public class HomeController {
         for (StockHistory h : historyList) {
             Map<String, Object> map = new HashMap<>();
             map.put("stock_history_id", h.getStockHistoryId());
-            map.put("amount", h.getAmount());
-            map.put("type", h.getType().name());
-            map.put("warehouses_detail", "");
-            map.put("create_at", h.getCreatedAt() != null ? h.getCreatedAt().toString() : "");
-            map.put("product_id", h.getProduct().getProductId());
-            map.put("user_id", h.getUser().getUserId());
-            map.put("product_name", h.getProduct().getProductName() != null ? h.getProduct().getProductName() : "");
+            map.put("amount",           h.getAmount());
+            map.put("type",             h.getType().name());
+            map.put("warehouses_detail","");
+            map.put("create_at",        h.getCreatedAt() != null ? h.getCreatedAt().toString() : "");
+            map.put("product_id",       h.getProduct().getProductId());
+            map.put("user_id",          h.getUser().getUserId());
+            map.put("product_name",     h.getProduct().getProductName() != null ? h.getProduct().getProductName() : "");
             result.add(map);
         }
         return ResponseEntity.ok(result);
     }
+
+    // POST /api/warehouses
     @PostMapping("/warehouses")
     public ResponseEntity<?> createWarehouse(@RequestBody Map<String, String> body) {
         try {
@@ -94,7 +97,7 @@ public class HomeController {
 
             Warehouse saved = warehouseRepository.save(warehouse);
 
-            // ✅ เพิ่มตรงนี้
+            // บันทึก Membership เจ้าของ (role = O)
             Membership.MembershipId membershipId = new Membership.MembershipId(
                     ownerId,
                     saved.getWarehouseId()
@@ -120,9 +123,95 @@ public class HomeController {
             return ResponseEntity.status(500).body("สร้างไม่สำเร็จ: " + e.getMessage());
         }
     }
-    // =========================================================
-    // 🌟 แก้ไขฟังก์ชันนี้ เพื่อส่งข้อมูลให้ทั้งคุณและเพื่อนใช้งานได้
-    // =========================================================
+
+    // POST /api/memberships — เพิ่มสมาชิก (เฉพาะ Role O)
+    @PostMapping("/memberships")
+    public ResponseEntity<?> addMember(@RequestBody Map<String, String> body) {
+        try {
+            String requesterId  = body.get("requester_id");
+            String targetUserId = body.get("user_id");
+            String warehouseId  = body.get("warehouse_id");
+            String roleStr      = body.get("role");
+
+            // เช็คว่า requester เป็น Role O ไหม
+            Membership.MembershipId requesterKey = new Membership.MembershipId(requesterId, warehouseId);
+            Membership requesterMembership = membershipRepository.findById(requesterKey).orElse(null);
+            if (requesterMembership == null || requesterMembership.getRole() != Membership.Role.O) {
+                return ResponseEntity.status(403).body("ไม่มีสิทธิ์เพิ่มสมาชิก เฉพาะเจ้าของโกดังเท่านั้น");
+            }
+
+            // ห้ามกำหนด Role O
+            if (roleStr.equals("O")) {
+                return ResponseEntity.status(400).body("ไม่สามารถกำหนด Role O ได้ มีได้แค่ 1 คนต่อโกดัง");
+            }
+
+            User targetUser = userRepository.findById(targetUserId).orElse(null);
+            if (targetUser == null) {
+                return ResponseEntity.status(404).body("ไม่พบผู้ใช้");
+            }
+
+            Warehouse warehouse = warehouseRepository.findById(warehouseId).orElse(null);
+            if (warehouse == null) {
+                return ResponseEntity.status(404).body("ไม่พบโกดัง");
+            }
+
+            // เช็คว่ามีอยู่แล้วไหม
+            Membership.MembershipId newId = new Membership.MembershipId(targetUserId, warehouseId);
+            if (membershipRepository.existsById(newId)) {
+                return ResponseEntity.status(409).body("สมาชิกคนนี้มีอยู่แล้วในโกดัง");
+            }
+
+            Membership membership = new Membership();
+            membership.setId(newId);
+            membership.setUser(targetUser);
+            membership.setWarehouse(warehouse);
+            membership.setRole(Membership.Role.valueOf(roleStr));
+            membershipRepository.save(membership);
+
+            return ResponseEntity.ok("เพิ่มสมาชิกสำเร็จ");
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("เกิดข้อผิดพลาด: " + e.getMessage());
+        }
+    }
+
+    // PUT /api/memberships — เปลี่ยน role (เฉพาะ Role O)
+    @PutMapping("/memberships")
+    public ResponseEntity<?> updateMemberRole(@RequestBody Map<String, String> body) {
+        try {
+            String requesterId  = body.get("requester_id");
+            String targetUserId = body.get("user_id");
+            String warehouseId  = body.get("warehouse_id");
+            String roleStr      = body.get("role");
+
+            // เช็คว่า requester เป็น Role O ไหม
+            Membership.MembershipId requesterKey = new Membership.MembershipId(requesterId, warehouseId);
+            Membership requesterMembership = membershipRepository.findById(requesterKey).orElse(null);
+            if (requesterMembership == null || requesterMembership.getRole() != Membership.Role.O) {
+                return ResponseEntity.status(403).body("ไม่มีสิทธิ์เปลี่ยน role เฉพาะเจ้าของโกดังเท่านั้น");
+            }
+
+            // ห้ามเปลี่ยนเป็น O
+            if (roleStr.equals("O")) {
+                return ResponseEntity.status(400).body("ไม่สามารถกำหนด Role O ได้");
+            }
+
+            Membership.MembershipId targetKey = new Membership.MembershipId(targetUserId, warehouseId);
+            Membership targetMembership = membershipRepository.findById(targetKey).orElse(null);
+            if (targetMembership == null) {
+                return ResponseEntity.status(404).body("ไม่พบสมาชิกคนนี้ในโกดัง");
+            }
+
+            targetMembership.setRole(Membership.Role.valueOf(roleStr));
+            membershipRepository.save(targetMembership);
+
+            return ResponseEntity.ok("เปลี่ยน role สำเร็จ");
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("เกิดข้อผิดพลาด: " + e.getMessage());
+        }
+    }
+
     // GET /api/warehouses/{warehouseId}/products
     @GetMapping("/warehouses/{warehouseId}/products")
     public ResponseEntity<?> getProductsByWarehouse(@PathVariable String warehouseId) {
@@ -133,43 +222,26 @@ public class HomeController {
             }
 
             List<Map<String, Object>> result = new ArrayList<>();
-
             if (warehouse.getProducts() != null) {
                 for (var product : warehouse.getProducts()) {
                     Map<String, Object> map = new HashMap<>();
-
-                    // ------------------------------------------
-                    // 🧑‍💻 1. ชุดข้อมูลสำหรับแอปของ "เพื่อนคุณ" (มี _)
-                    // ------------------------------------------
                     map.put("product_id",    product.getProductId());
                     map.put("product_name",  product.getProductName() != null ? product.getProductName() : "");
                     map.put("category_name", product.getCategory() != null ? product.getCategory().getCategoryName() : null);
-
-                    // ------------------------------------------
-                    // 🙋‍♂️ 2. ชุดข้อมูลสำหรับแอปของ "คุณ" (CamelCase)
-                    // ------------------------------------------
                     map.put("productId",     product.getProductId());
                     map.put("productName",   product.getProductName() != null ? product.getProductName() : "");
                     map.put("sku",           product.getSku() != null ? product.getSku() : "");
                     map.put("createdAt",     product.getCreatedAt() != null ? product.getCreatedAt().toString() : "");
-
-                    // สร้างโครงสร้าง Category Object เพื่อแอปของคุณ
+                    map.put("quantity",      product.getQuantity());
                     if (product.getCategory() != null) {
                         Map<String, Object> catMap = new HashMap<>();
-                        catMap.put("categoryId", product.getCategory().getCategoryId());
+                        catMap.put("categoryId",   product.getCategory().getCategoryId());
                         catMap.put("categoryName", product.getCategory().getCategoryName());
                         map.put("category", catMap);
                     }
-
-                    // ------------------------------------------
-                    // 🤝 3. ข้อมูลที่ใช้ร่วมกันได้ (ชื่อเหมือนกัน)
-                    // ------------------------------------------
-                    map.put("quantity",      product.getQuantity());
-
                     result.add(map);
                 }
             }
-
             return ResponseEntity.ok(result);
 
         } catch (Exception e) {
@@ -198,6 +270,7 @@ public class HomeController {
         }
     }
 
+    // DELETE /api/warehouses/{warehouseId}
     @Transactional
     @DeleteMapping("/warehouses/{warehouseId}")
     public ResponseEntity<?> deleteWarehouse(@PathVariable String warehouseId) {
