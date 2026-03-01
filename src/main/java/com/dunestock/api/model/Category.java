@@ -1,5 +1,6 @@
 package com.dunestock.api.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -25,6 +26,7 @@ public class Category {
     private Warehouse warehouse;
 
     @OneToMany(mappedBy = "category")
+    @JsonIgnore // 🚨 เติมบรรทัดนี้ เพื่อป้องกัน JSON วนลูปไม่รู้จบตอนส่งข้อมูล
     private List<Product> products;
 
     public String getCategoryId() {

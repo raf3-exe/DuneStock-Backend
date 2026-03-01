@@ -4,7 +4,10 @@ import com.dunestock.api.model.Category;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, String> {
-    // แค่นี้เลยครับ ปล่อยว่างๆ ไว้ข้างในได้เลย Spring Boot จะจัดการต่อให้เอง!
+    // 🌟 เพิ่มบรรทัดนี้ เพื่อให้หาหมวดหมู่เฉพาะของโกดังนั้นๆ ได้
+    List<Category> findByWarehouse_WarehouseId(String warehouseId);
 }
