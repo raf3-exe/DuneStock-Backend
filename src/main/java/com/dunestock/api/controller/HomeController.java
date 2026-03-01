@@ -30,6 +30,7 @@ public class HomeController {
     @Autowired private UserRepository userRepository;
     @Autowired private MembershipRepository membershipRepository;
 
+
     // GET /api/warehouses
     // ✅ อัปเดต: ดึงโกดังทั้งหมดที่คุณเป็นสมาชิกอยู่ (ยกเว้นสถานะ W รอตอบรับ)
     @GetMapping("/warehouses")
@@ -326,6 +327,38 @@ public class HomeController {
 
         } catch (Exception e) {
             return ResponseEntity.status(500).body("แก้ไขไม่สำเร็จ: " + e.getMessage());
+        }
+    }
+    // =========================================================
+    // 🌟 API ดึงสิทธิ์ของผู้ใช้ในโกดัง (Role: O, E, V)
+    // =========================================================
+    @GetMapping("/warehouses/{warehouseId}/role")
+    public ResponseEntity<?> getUserRoleInWarehouse(@PathVariable String warehouseId, @RequestParam String userId) {
+        try {
+            Map<String, String> response = new HashMap<>();
+
+            // 1. เช็คก่อนว่าเป็นเจ้าของโกดังหรือไม่ (Owner)
+            Warehouse warehouse = warehouseRepository.findById(warehouseId).orElse(null);
+            if (warehouse != null && warehouse.getOwner().getUserId().equals(userId)) {
+                response.put("role", "O"); // ถ้าเป็นคนสร้างโกดัง ให้สิทธิ์ Owner (O) ทันที
+                return ResponseEntity.ok(response);
+            }
+
+            // 2. ถ้าไม่ใช่คนสร้าง ให้ไปค้นหาในตาราง memberships ด้วยฟังก์ชันที่เราเพิ่งสร้าง
+            Membership membership = membershipRepository.findByUserUserIdAndWarehouseWarehouseId(userId, warehouseId);
+
+            if (membership != null && membership.getRole() != null) {
+                // ดึงสิทธิ์ออกมา (E หรือ V)
+                response.put("role", membership.getRole().name());
+            } else {
+                // ถ้าหาไม่เจอ หรือยังไม่ได้เป็นสมาชิก ให้สิทธิ์ต่ำสุดคือ Viewer (V) ไว้ก่อน
+                response.put("role", "V");
+            }
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
     }
 }

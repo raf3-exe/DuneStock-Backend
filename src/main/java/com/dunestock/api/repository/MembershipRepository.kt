@@ -23,5 +23,7 @@ interface MembershipRepository : JpaRepository<Membership, Membership.Membership
 
     fun findByUserUserIdAndRole(userId: String?, role: Membership.Role?): MutableList<Membership?>?
 
+    fun findByUserUserIdAndWarehouseWarehouseId(userId: String, warehouseId: String): Membership?
+
 }
 
