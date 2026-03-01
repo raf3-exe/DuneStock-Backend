@@ -100,10 +100,10 @@ public class Membership {
     @Embeddable
     public static class MembershipId implements Serializable {
 
-        @Column(name = "user_id", length = 5)
+        @Column(name = "user_id", length = 255)
         private String userId;
 
-        @Column(name = "warehouse_id", length = 5)
+        @Column(name = "warehouse_id", length = 255)
         private String warehouseId;
 
         public MembershipId() {}

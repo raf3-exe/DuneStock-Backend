@@ -31,21 +31,35 @@ public class HomeController {
     @Autowired private MembershipRepository membershipRepository;
 
     // GET /api/warehouses
+    // ✅ อัปเดต: ดึงโกดังทั้งหมดที่คุณเป็นสมาชิกอยู่ (ยกเว้นสถานะ W รอตอบรับ)
     @GetMapping("/warehouses")
     public ResponseEntity<?> getWarehouses(@RequestParam String userId) {
-        List<Warehouse> warehouses = warehouseRepository.findByOwnerUserId(userId);
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Warehouse w : warehouses) {
-            Map<String, Object> map = new HashMap<>();
-            map.put("warehouse_id",      w.getWarehouseId());
-            map.put("warehouse_name",    w.getWarehouseName());
-            map.put("warehouses_detail", w.getWarehouseDetail() != null ? w.getWarehouseDetail() : "");
-            map.put("create_at",         w.getCreatedAt() != null ? w.getCreatedAt().toString() : "");
-            map.put("owner_id",          w.getOwner().getUserId());
-            map.put("owner_username",    w.getOwner().getUsername());
-            result.add(map);
+        try {
+            List<Membership> memberships = membershipRepository.findByUserUserId(userId);
+            List<Map<String, Object>> result = new ArrayList<>();
+
+            for (Membership m : memberships) {
+                // ข้ามคำเชิญที่ยังไม่ตอบรับ
+                if (m.getRole() == Membership.Role.W) {
+                    continue;
+                }
+
+                Warehouse w = m.getWarehouse();
+                Map<String, Object> map = new HashMap<>();
+                map.put("warehouse_id",      w.getWarehouseId());
+                map.put("warehouse_name",    w.getWarehouseName());
+                map.put("warehouses_detail", w.getWarehouseDetail() != null ? w.getWarehouseDetail() : "");
+                map.put("create_at",         w.getCreatedAt() != null ? w.getCreatedAt().toString() : "");
+                map.put("owner_id",          w.getOwner() != null ? w.getOwner().getUserId() : "");
+                map.put("owner_username",    w.getOwner() != null ? w.getOwner().getUsername() : "");
+                map.put("my_role",           m.getRole().name()); // ส่ง role กลับไปด้วยเผื่อใช้ในแอป
+
+                result.add(map);
+            }
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("เกิดข้อผิดพลาด: " + e.getMessage());
         }
-        return ResponseEntity.ok(result);
     }
 
     // GET /api/stock-history
@@ -88,6 +102,7 @@ public class HomeController {
 
             Warehouse saved = warehouseRepository.save(warehouse);
 
+            // เมื่อสร้างโกดัง ให้ตัวเองเป็นเจ้าของ (Role O)
             Membership.MembershipId membershipId = new Membership.MembershipId(ownerId, saved.getWarehouseId());
             Membership membership = new Membership();
             membership.setId(membershipId);
@@ -110,7 +125,7 @@ public class HomeController {
         }
     }
 
-    // GET /api/warehouses/invitations?userId=...  ✅ ใหม่
+    // GET /api/warehouses/invitations?userId=...
     @GetMapping("/warehouses/invitations")
     public ResponseEntity<?> getInvitations(@RequestParam String userId) {
         try {
@@ -118,7 +133,7 @@ public class HomeController {
             List<Map<String, Object>> result = new ArrayList<>();
             for (Membership m : memberships) {
                 Map<String, Object> map = new HashMap<>();
-                map.put("inv_id",         m.getId().getWarehouseId());
+                map.put("inv_id",         m.getId().getWarehouseId()); // ใช้อันนี้เพื่อการลบ/อัปเดต
                 map.put("warehouse_id",   m.getWarehouse().getWarehouseId());
                 map.put("warehouse_name", m.getWarehouse().getWarehouseName());
                 map.put("owner_username", m.getWarehouse().getOwner().getUsername());
@@ -130,7 +145,7 @@ public class HomeController {
         }
     }
 
-    // POST /api/warehouses/invitations/{invId}/accept?userId=...  ✅ ใหม่
+    // POST /api/warehouses/invitations/{invId}/accept?userId=...
     @PostMapping("/warehouses/invitations/{invId}/accept")
     public ResponseEntity<?> acceptInvitation(
             @PathVariable String invId,
@@ -140,6 +155,7 @@ public class HomeController {
             Membership membership = membershipRepository.findById(id).orElse(null);
             if (membership == null) return ResponseEntity.status(404).body("ไม่พบคำเชิญ");
 
+            // เปลี่ยนสถานะเป็น V (Viewer) หรือตำแหน่งอื่นตามที่ต้องการ
             membership.setRole(Membership.Role.V);
             membershipRepository.save(membership);
             return ResponseEntity.ok("ตอบรับสำเร็จ");
@@ -148,7 +164,7 @@ public class HomeController {
         }
     }
 
-    // DELETE /api/warehouses/invitations/{invId}?userId=...  ✅ ใหม่
+    // DELETE /api/warehouses/invitations/{invId}?userId=...
     @DeleteMapping("/warehouses/invitations/{invId}")
     public ResponseEntity<?> declineInvitation(
             @PathVariable String invId,
@@ -168,16 +184,9 @@ public class HomeController {
     @PostMapping("/memberships")
     public ResponseEntity<?> addMember(@RequestBody Map<String, String> body) {
         try {
-            String requesterId  = body.get("requester_id");
             String targetUserId = body.get("user_id");
             String warehouseId  = body.get("warehouse_id");
             String roleStr      = body.get("role");
-
-            Membership.MembershipId requesterKey = new Membership.MembershipId(requesterId, warehouseId);
-            Membership requesterMembership = membershipRepository.findById(requesterKey).orElse(null);
-            if (requesterMembership == null || requesterMembership.getRole() != Membership.Role.O) {
-                return ResponseEntity.status(403).body("ไม่มีสิทธิ์เพิ่มสมาชิก เฉพาะเจ้าของโกดังเท่านั้น");
-            }
 
             if (roleStr.equals("O")) {
                 return ResponseEntity.status(400).body("ไม่สามารถกำหนด Role O ได้");
@@ -207,21 +216,13 @@ public class HomeController {
         }
     }
 
-    // PUT /api/memberships
-    @PutMapping("/memberships")
-    public ResponseEntity<?> updateMemberRole(@RequestBody Map<String, String> body) {
+    // PUT /api/memberships/{userId}/{warehouseId}/role
+    @PutMapping("/memberships/{userId}/{warehouseId}/role")
+    public ResponseEntity<?> updateMemberRole(
+            @PathVariable("userId") String targetUserId,
+            @PathVariable("warehouseId") String warehouseId,
+            @RequestParam("role") String roleStr) {
         try {
-            String requesterId  = body.get("requester_id");
-            String targetUserId = body.get("user_id");
-            String warehouseId  = body.get("warehouse_id");
-            String roleStr      = body.get("role");
-
-            Membership.MembershipId requesterKey = new Membership.MembershipId(requesterId, warehouseId);
-            Membership requesterMembership = membershipRepository.findById(requesterKey).orElse(null);
-            if (requesterMembership == null || requesterMembership.getRole() != Membership.Role.O) {
-                return ResponseEntity.status(403).body("ไม่มีสิทธิ์เปลี่ยน role เฉพาะเจ้าของโกดังเท่านั้น");
-            }
-
             if (roleStr.equals("O")) return ResponseEntity.status(400).body("ไม่สามารถกำหนด Role O ได้");
 
             Membership.MembershipId targetKey = new Membership.MembershipId(targetUserId, warehouseId);
@@ -293,23 +294,18 @@ public class HomeController {
         }
     }
 
-    // =========================================================
-    // 🌟 API สำหรับแก้ไขข้อมูลโกดัง (แก้ปัญหาชื่อหาย/แอปเด้ง)
-    // =========================================================
+    // PUT /api/warehouses/update/{id}
     @PutMapping("/warehouses/update/{id}")
     public ResponseEntity<?> updateWarehouse(@PathVariable String id, @RequestBody Map<String, String> body) {
         try {
-            // 1. ค้นหาโกดังเดิมในฐานข้อมูล
             Warehouse warehouse = warehouseRepository.findById(id).orElse(null);
             if (warehouse == null) {
                 return ResponseEntity.status(404).body("ไม่พบโกดัง id: " + id);
             }
 
-            // 2. ดึงข้อมูลจาก Android ที่ส่งมา (มี _)
             String whName = body.get("warehouse_name");
             String whDetail = body.get("warehouses_detail");
 
-            // 3. อัปเดตข้อมูล (ป้องกันค่า null)
             if (whName != null && !whName.isEmpty()) {
                 warehouse.setWarehouseName(whName);
             }
@@ -317,10 +313,8 @@ public class HomeController {
                 warehouse.setWarehouseDetail(whDetail);
             }
 
-            // 4. บันทึกลงฐานข้อมูล
             Warehouse updatedWarehouse = warehouseRepository.save(warehouse);
 
-            // 5. ส่งข้อมูลกลับไปให้ Android แบบฟอร์แมตเดิม
             Map<String, Object> result = new HashMap<>();
             result.put("warehouse_id", updatedWarehouse.getWarehouseId());
             result.put("warehouse_name", updatedWarehouse.getWarehouseName());
