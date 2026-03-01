@@ -284,4 +284,46 @@ public class HomeController {
             return ResponseEntity.status(500).body("ลบไม่สำเร็จ: " + e.getMessage());
         }
     }
+
+    // =========================================================
+    // 🌟 API สำหรับแก้ไขข้อมูลโกดัง (แก้ปัญหาชื่อหาย/แอปเด้ง)
+    // =========================================================
+    @PutMapping("/warehouses/update/{id}")
+    public ResponseEntity<?> updateWarehouse(@PathVariable String id, @RequestBody Map<String, String> body) {
+        try {
+            // 1. ค้นหาโกดังเดิมในฐานข้อมูล
+            Warehouse warehouse = warehouseRepository.findById(id).orElse(null);
+            if (warehouse == null) {
+                return ResponseEntity.status(404).body("ไม่พบโกดัง id: " + id);
+            }
+
+            // 2. ดึงข้อมูลจาก Android ที่ส่งมา (มี _)
+            String whName = body.get("warehouse_name");
+            String whDetail = body.get("warehouses_detail");
+
+            // 3. อัปเดตข้อมูล (ป้องกันค่า null)
+            if (whName != null && !whName.isEmpty()) {
+                warehouse.setWarehouseName(whName);
+            }
+            if (whDetail != null) {
+                warehouse.setWarehouseDetail(whDetail);
+            }
+
+            // 4. บันทึกลงฐานข้อมูล
+            Warehouse updatedWarehouse = warehouseRepository.save(warehouse);
+
+            // 5. ส่งข้อมูลกลับไปให้ Android แบบฟอร์แมตเดิม
+            Map<String, Object> result = new HashMap<>();
+            result.put("warehouse_id", updatedWarehouse.getWarehouseId());
+            result.put("warehouse_name", updatedWarehouse.getWarehouseName());
+            result.put("warehouses_detail", updatedWarehouse.getWarehouseDetail() != null ? updatedWarehouse.getWarehouseDetail() : "");
+            result.put("create_at", updatedWarehouse.getCreatedAt() != null ? updatedWarehouse.getCreatedAt().toString() : "");
+            result.put("owner_id", updatedWarehouse.getOwner() != null ? updatedWarehouse.getOwner().getUserId() : "");
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("แก้ไขไม่สำเร็จ: " + e.getMessage());
+        }
+    }
 }
