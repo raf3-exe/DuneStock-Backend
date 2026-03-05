@@ -10,5 +10,9 @@ import java.util.List;
 public interface StockHistoryRepository extends JpaRepository<StockHistory, String> {
     List<StockHistory> findByUserUserId(String userId);
 
+    List<StockHistory> findByWarehouse_WarehouseIdOrderByCreatedAtDesc(String warehouseId);
+
 
 }
+
+

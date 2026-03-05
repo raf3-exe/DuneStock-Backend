@@ -361,4 +361,41 @@ public class HomeController {
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
     }
+
+    // =========================================================
+    // 🌟 API ดึงประวัติเข้า-ออก เฉพาะของโกดังนั้นๆ (สำหรับหน้าประวัติโกดัง)
+    // =========================================================
+    @GetMapping("/history/warehouse/{warehouseId}")
+    public ResponseEntity<List<Map<String, Object>>> getWarehouseHistory(@PathVariable String warehouseId) {
+        try {
+            // ดึงประวัติเรียงจากใหม่ไปเก่า
+            List<StockHistory> historyList = stockHistoryRepository.findByWarehouse_WarehouseIdOrderByCreatedAtDesc(warehouseId);
+
+            List<Map<String, Object>> result = new ArrayList<>();
+            for(StockHistory h : historyList) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("historyId", h.getStockHistoryId());
+                map.put("amount", h.getAmount());
+                map.put("type", h.getType().name()); // IN หรือ OUT
+                map.put("date", h.getCreatedAt() != null ? h.getCreatedAt().toString() : "");
+
+                // ดึงชื่อสินค้าและหมวดหมู่ (ดัก null ไว้กันแอปพัง)
+                if (h.getProduct() != null) {
+                    map.put("productName", h.getProduct().getProductName());
+                    map.put("categoryName", h.getProduct().getCategory() != null ? h.getProduct().getCategory().getCategoryName() : "ไม่ระบุ");
+                } else {
+                    map.put("productName", "สินค้าถูกลบ");
+                    map.put("categoryName", "-");
+                }
+
+                // ดึงชื่อคนทำรายการ
+                map.put("username", h.getUser() != null ? h.getUser().getUsername() : "ไม่ระบุ");
+
+                result.add(map);
+            }
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(null);
+        }
+    }
 }
