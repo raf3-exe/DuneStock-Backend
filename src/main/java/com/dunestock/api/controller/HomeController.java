@@ -239,7 +239,6 @@ public class HomeController {
         }
     }
 
-    // GET /api/warehouses/{warehouseId}/products
     @GetMapping("/warehouses/{warehouseId}/products")
     public ResponseEntity<?> getProductsByWarehouse(@PathVariable String warehouseId) {
         try {
@@ -249,6 +248,12 @@ public class HomeController {
             List<Map<String, Object>> result = new ArrayList<>();
             if (warehouse.getProducts() != null) {
                 for (var product : warehouse.getProducts()) {
+
+                    // 🌟 เติม If บรรทัดนี้: ถ้าสินค้าขึ้นสถานะว่าโดนลบแล้ว (isDeleted = true) ให้ข้ามชิ้นนี้ไปเลย ไม่โชว์
+                    if (product.isDeleted()) {
+                        continue;
+                    }
+
                     Map<String, Object> map = new HashMap<>();
                     map.put("product_id",    product.getProductId());
                     map.put("product_name",  product.getProductName() != null ? product.getProductName() : "");

@@ -95,9 +95,9 @@ public class ProductController {
 
         // 🌟 ดึงเฉพาะสินค้าที่ยังไม่โดนลบ
         if (warehouseId != null && !warehouseId.isEmpty()) {
-            productPage = productRepository.findByWarehouse_WarehouseId(warehouseId, pageable);
+            productPage = productRepository.findByWarehouse_WarehouseIdAndIsDeletedFalse(warehouseId, pageable);
         } else {
-            productPage = productRepository.findAll(pageable);
+            productPage = productRepository.findByIsDeletedFalse(pageable);
         }
 
         List<Map<String, Object>> products = productPage.getContent().stream()
