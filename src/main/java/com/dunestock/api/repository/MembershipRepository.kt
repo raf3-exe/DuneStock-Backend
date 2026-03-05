@@ -15,11 +15,11 @@ interface MembershipRepository : JpaRepository<Membership, Membership.Membership
     fun findByWarehouseWarehouseId(warehouseId: String): List<Membership>
 
     // สมมติว่าในโมเดล Warehouse คุณใช้ฟิลด์ owner ผูกกับตาราง User
-    interface WarehousesRepository : JpaRepository<Warehouse, String> {
-
-        // เพิ่มคำสั่งนี้เพื่อหาว่า User คนนี้เป็นเจ้าของโกดังไหน
-        fun findByOwnerUserId(userId: String): List<Warehouse>
-    }
+//    interface WarehousesRepository : JpaRepository<Warehouse, String> {
+//
+//        // เพิ่มคำสั่งนี้เพื่อหาว่า User คนนี้เป็นเจ้าของโกดังไหน
+//        fun findByOwnerUserId(userId: String): List<Warehouse>
+//    }
 
     fun findByUserUserIdAndRole(userId: String?, role: Membership.Role?): MutableList<Membership?>?
 
