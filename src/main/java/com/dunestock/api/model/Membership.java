@@ -37,6 +37,37 @@ public class Membership {
     @Enumerated(EnumType.STRING)
     @Column(columnDefinition = "ENUM('O','E','V','W')")
     private Role role;
+//    @Enumerated(EnumType.STRING)
+//    @Column(name = "role")
+//    private Role role;
+
+
+
+    // ✅ 1. เพิ่มคอลัมน์ใหม่สำหรับเก็บตำแหน่งที่ตั้งใจจะมอบให้ (แอบทดไว้ก่อน)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "intended_role", columnDefinition = "ENUM('O','E','V','W')")
+    private Role intendedRole;
+
+    // ✅ 2. เพิ่ม Getter / Setter
+    public Role getIntendedRole() {
+        return intendedRole;
+    }
+
+    public void setIntendedRole(Role intendedRole) {
+        this.intendedRole = intendedRole;
+    }
+
+
+
+    // ✅ 1. เพิ่มฟิลด์ Status
+    @Column(name = "status")
+    private String status = "PENDING"; // PENDING = รอตอบรับ, ACTIVE = ตอบรับแล้ว
+
+    // ✅ 2. อย่าลืมเพิ่ม Getter / Setter ให้ status ด้วยนะครับ
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+
 
     @Column(name = "create_at")
     private LocalDateTime createdAt;

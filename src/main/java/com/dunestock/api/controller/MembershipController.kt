@@ -18,15 +18,14 @@ class MembershipController(
 
     @PostMapping
     fun createMembership(
-        @RequestBody body: Map<String, String> // ✅ เปลี่ยนจาก @RequestParam เป็น @RequestBody
+        @RequestBody body: Map<String, String>
     ): ResponseEntity<Map<String, String>> {
-
         val userId      = body["user_id"]      ?: return ResponseEntity.badRequest().body(mapOf("message" to "missing user_id"))
         val warehouseId = body["warehouse_id"] ?: return ResponseEntity.badRequest().body(mapOf("message" to "missing warehouse_id"))
         val roleStr     = body["role"]         ?: return ResponseEntity.badRequest().body(mapOf("message" to "missing role"))
 
         val role = try {
-            Membership.Role.valueOf(roleStr)
+            Membership.Role.valueOf(roleStr) // เช่น E หรือ V
         } catch (e: Exception) {
             return ResponseEntity.badRequest().body(mapOf("message" to "invalid role: $roleStr"))
         }
@@ -37,17 +36,16 @@ class MembershipController(
             return ResponseEntity.status(409).body(mapOf("message" to "Member already exists"))
         }
 
-        val user = userRepository.findById(userId)
-            .orElseThrow { RuntimeException("User not found") }
-
-        val warehouse = warehouseRepository.findById(warehouseId)
-            .orElseThrow { RuntimeException("Warehouse not found") }
+        val user = userRepository.findById(userId).orElseThrow { RuntimeException("User not found") }
+        val warehouse = warehouseRepository.findById(warehouseId).orElseThrow { RuntimeException("Warehouse not found") }
 
         val membership = Membership().apply {
             this.id = id
             this.user = user
             this.warehouse = warehouse
-            this.role = role
+            this.role = Membership.Role.W       // 🛑 บังคับเป็น 'W' เพื่อให้ต้องกดรับก่อน
+            this.intendedRole = role            // ✅ ฝากตำแหน่งจริง (E/V) ไว้ที่นี่
+            this.status = "PENDING"             // ⏳ เซ็ตสถานะเป็นรอกดยอมรับ
         }
 
         membershipRepository.save(membership)
@@ -111,4 +109,92 @@ class MembershipController(
         }
         return ResponseEntity.ok(responseList)
     }
+
+
+
+
+//    @DeleteMapping("/{userId}/{warehouseId}")
+//    fun deleteMembership(
+//        @PathVariable userId: String,
+//        @PathVariable warehouseId: String
+//    ): ResponseEntity<Map<String, String>> {
+//        val id = MembershipId(userId, warehouseId)
+//
+//        if (!membershipRepository.existsById(id)) {
+//            return ResponseEntity.status(404).body(mapOf("message" to "Membership not found"))
+//        }
+//
+//        membershipRepository.deleteById(id)
+//        return ResponseEntity.ok(mapOf("message" to "Membership deleted (Invitation cancelled)"))
+//    }
+
+    @DeleteMapping("/{userId}/{warehouseId}")
+    fun deleteMembership(
+        @PathVariable userId: String,
+        @PathVariable warehouseId: String
+    ): ResponseEntity<Map<String, String>> {
+
+        println("DELETE membership userId=$userId warehouseId=$warehouseId")
+
+        val id = MembershipId(userId, warehouseId)
+
+        if (!membershipRepository.existsById(id)) {
+            println("❌ membership not found")
+            return ResponseEntity.status(404).body(mapOf("message" to "Membership not found"))
+        }
+
+        membershipRepository.deleteById(id)
+        println("✅ membership deleted")
+
+        return ResponseEntity.ok(mapOf("message" to "Membership deleted"))
+    }
+
+
+
+//    @PutMapping("/{userId}/{warehouseId}/accept")
+//    fun acceptMembership(
+//        @PathVariable userId: String,
+//        @PathVariable warehouseId: String
+//    ): ResponseEntity<Map<String, String>> {
+//        val id = MembershipId(userId, warehouseId)
+//        val membership = membershipRepository.findById(id)
+//            .orElseThrow { RuntimeException("Invitation not found") }
+//
+//        // 🚨 1. เพิ่มบรรทัดนี้ เพื่อแอบดูค่าก่อนที่จะถูกเปลี่ยน
+//        println("👉 ก่อนกดยอมรับ: Role=${membership.role}, IntendedRole=${membership.intendedRole}")
+//
+//        membership.role = membership.intendedRole ?: Membership.Role.V
+//
+//        // 🚨 2. เพิ่มบรรทัดนี้ เพื่อดูว่าตกลงมันเปลี่ยนเป็นอะไรกันแน่
+//        println("👉 หลังกดยอมรับ: สรุปเปลี่ยน Role เป็น = ${membership.role}")
+//
+//        membershipRepository.save(membership)
+//
+//        return ResponseEntity.ok(mapOf("message" to "Accepted successfully"))
+//    }
+
+    @PutMapping("/{userId}/{warehouseId}/accept")
+    fun acceptMembership(
+        @PathVariable userId: String,
+        @PathVariable warehouseId: String
+    ): ResponseEntity<Map<String, String>> {
+        val id = MembershipId(userId, warehouseId)
+        val membership = membershipRepository.findById(id)
+            .orElseThrow { RuntimeException("Invitation not found") }
+
+        // ✅ ย้ายค่าจากตำแหน่งที่ "ตั้งใจจะให้" (intendedRole) มาเป็น "ตำแหน่งจริง" (role)
+        // ถ้าตอนเชิญเลือก 'E' ค่า membership.role ก็จะเปลี่ยนจาก 'W' กลายเป็น 'E' ทันที
+        membership.role = membership.intendedRole ?: Membership.Role.V
+
+        // ✅ เปลี่ยนสถานะเป็น ACTIVE เพื่อบอกว่าการเชื่อมต่อสมบูรณ์แล้ว
+        membership.status = "ACTIVE"
+
+        membershipRepository.save(membership)
+        return ResponseEntity.ok(mapOf("message" to "Accepted successfully"))
+    }
+
+
+
+
+
 }

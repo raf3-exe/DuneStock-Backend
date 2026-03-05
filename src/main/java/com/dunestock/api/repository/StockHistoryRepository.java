@@ -1,6 +1,7 @@
 package com.dunestock.api.repository;
 
 import com.dunestock.api.model.StockHistory;
+import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,7 +13,9 @@ public interface StockHistoryRepository extends JpaRepository<StockHistory, Stri
 
     List<StockHistory> findByWarehouse_WarehouseIdOrderByCreatedAtDesc(String warehouseId);
 
-
+    @Transactional
+    void deleteByProduct_ProductId(String productId);
 }
+
 
 

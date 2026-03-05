@@ -2,6 +2,7 @@ package com.dunestock.api.controller;
 
 import com.dunestock.api.model.*;
 import com.dunestock.api.repository.*;
+import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -24,13 +25,13 @@ public class ProductController {
     private final WarehouseRepository warehouseRepository;
     private final CategoryRepository categoryRepository;
     private final StockHistoryRepository stockHistoryRepository;
-    private final UserRepository userRepository; // 🌟 1. เพิ่มตัวช่วยค้นหา User
+    private final UserRepository userRepository;
 
     public ProductController(ProductRepository productRepository,
                              WarehouseRepository warehouseRepository,
                              CategoryRepository categoryRepository,
                              StockHistoryRepository stockHistoryRepository,
-                             UserRepository userRepository) { // 🌟 รับ UserRepository
+                             UserRepository userRepository) {
         this.productRepository = productRepository;
         this.warehouseRepository = warehouseRepository;
         this.categoryRepository = categoryRepository;
@@ -38,7 +39,6 @@ public class ProductController {
         this.userRepository = userRepository;
     }
 
-    // 🌟 2. อัปเดตฟังก์ชันบันทึกประวัติให้รับ userId
     private void recordStockHistory(Product product, Warehouse warehouse, int amount, StockHistory.StockType type, String userId) {
         if (amount <= 0) return;
 
@@ -50,7 +50,7 @@ public class ProductController {
         history.setAmount(amount);
         history.setType(type);
 
-        // 🌟 3. ค้นหา User จาก ID ที่ส่งมาและผูกกับประวัติ
+        history.setCreatedAt(LocalDateTime.now());
         if (userId != null && !userId.isEmpty()) {
             User user = userRepository.findById(userId).orElse(null);
             history.setUser(user);
@@ -60,7 +60,6 @@ public class ProductController {
         System.out.println("✅ บันทึกประวัติสำเร็จ: " + type + " จำนวน " + amount + " โดย User: " + userId);
     }
 
-    // Method แปลงข้อมูล (คงเดิม)
     private Map<String, Object> convertToMap(Product product) {
         Map<String, Object> map = new HashMap<>();
         map.put("productId", product.getProductId());
@@ -68,7 +67,7 @@ public class ProductController {
         map.put("sku", product.getSku());
         map.put("quantity", product.getQuantity());
         map.put("createdAt", product.getCreatedAt() != null ? product.getCreatedAt().toString() : "");
-
+        map.put("isDeleted", product.isDeleted());
         if (product.getCategory() != null) {
             Map<String, Object> catMap = new HashMap<>();
             catMap.put("categoryId", product.getCategory().getCategoryId());
@@ -94,6 +93,7 @@ public class ProductController {
         Pageable pageable = PageRequest.of(page, size, Sort.by("productId").ascending());
         Page<Product> productPage;
 
+        // 🌟 ดึงเฉพาะสินค้าที่ยังไม่โดนลบ
         if (warehouseId != null && !warehouseId.isEmpty()) {
             productPage = productRepository.findByWarehouse_WarehouseId(warehouseId, pageable);
         } else {
@@ -112,7 +112,6 @@ public class ProductController {
         return ResponseEntity.ok(response);
     }
 
-    // 🌟 4. รับค่า userId ตอนเพิ่มสินค้า
     @PostMapping("/newProduct")
     public ResponseEntity<?> createProduct(@RequestBody Product productRequest, @RequestParam(required = false) String userId) {
         try {
@@ -141,7 +140,6 @@ public class ProductController {
             productRequest.setCreatedAt(LocalDateTime.now());
             Product saved = productRepository.save(productRequest);
 
-            // 🌟 ส่ง userId เข้าไปบันทึกด้วย
             recordStockHistory(saved, saved.getWarehouse(), saved.getQuantity(), StockHistory.StockType.IN, userId);
 
             return ResponseEntity.ok(convertToMap(saved));
@@ -151,12 +149,12 @@ public class ProductController {
         }
     }
 
-    // 🌟 5. รับค่า userId ตอนอัปเดตสินค้า
     @PutMapping("/updateProduct/{id}")
     public ResponseEntity<?> updateProduct(@PathVariable String id, @RequestBody Product productDetails, @RequestParam(required = false) String userId) {
         try {
             Product existingProduct = productRepository.findById(id).orElse(null);
-            if (existingProduct == null) {
+            // 🌟 ตรวจสอบด้วยว่าสินค้าโดนลบไปหรือยัง
+            if (existingProduct == null || existingProduct.isDeleted()) {
                 return ResponseEntity.notFound().build();
             }
 
@@ -174,7 +172,6 @@ public class ProductController {
 
             Product saved = productRepository.save(existingProduct);
 
-            // 🌟 ส่ง userId เข้าไปบันทึกด้วย
             if (diff > 0) {
                 recordStockHistory(saved, saved.getWarehouse(), diff, StockHistory.StockType.IN, userId);
             } else if (diff < 0) {
@@ -192,11 +189,29 @@ public class ProductController {
         }
     }
 
+    // 🌟 เปลี่ยนระบบลบ เป็นระบบ "ซ่อน (Soft Delete)"
     @DeleteMapping("/delete/{id}")
-    public ResponseEntity<?> deleteProduct(@PathVariable String id) {
-        if (productRepository.existsById(id)) {
-            productRepository.deleteById(id);
-            return ResponseEntity.ok().build();
+    public ResponseEntity<?> deleteProduct(@PathVariable String id, @RequestParam(required = false) String userId) {
+        Product product = productRepository.findById(id).orElse(null);
+        if (product != null && !product.isDeleted()) {
+            try {
+                // เก็บจำนวนสินค้าที่มีอยู่เพื่อบันทึกประวัติว่าเอาออกไปเท่าไหร่
+                int qtyToRemove = product.getQuantity();
+
+                // ตั้งค่าเป็นถูกลบ และให้จำนวนเป็น 0
+                product.setDeleted(true);
+                product.setQuantity(0);
+                productRepository.save(product);
+
+                // บันทึกประวัติว่าผู้ใช้คนนี้ลบของชิ้นนี้
+                if (qtyToRemove > 0) {
+                    recordStockHistory(product, product.getWarehouse(), qtyToRemove, StockHistory.StockType.OUT, userId);
+                }
+
+                return ResponseEntity.ok().build();
+            } catch (Exception e) {
+                return ResponseEntity.internalServerError().body("Error deleting product: " + e.getMessage());
+            }
         } else {
             return ResponseEntity.notFound().build();
         }

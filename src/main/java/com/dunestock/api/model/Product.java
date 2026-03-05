@@ -23,6 +23,9 @@ public class Product {
     @Column(name = "create_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "is_deleted", columnDefinition = "TINYINT(1) DEFAULT 0")
+    private boolean isDeleted = false;
+
     @ManyToOne
     @JoinColumn(name = "warehouse_id")
     @JsonIgnoreProperties({"products", "categories", "stockHistories"})
@@ -93,4 +96,7 @@ public class Product {
     public void setSku(String sku) {
         this.sku = sku;
     }
+    public boolean isDeleted() { return isDeleted; }
+
+    public void setDeleted(boolean deleted) { this.isDeleted = deleted; }
 }
