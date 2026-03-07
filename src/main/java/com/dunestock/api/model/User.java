@@ -1,19 +1,14 @@
 package com.dunestock.api.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
-import lombok.Data;
-import org.springframework.data.jpa.repository.JpaRepository;
-
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
-@Data
 @Entity
 @Table(name = "users")
 public class User {
+
     @Id
     @Column(name = "user_id", length = 5)
     private String userId;
@@ -36,14 +31,23 @@ public class User {
     @Column(name = "delete_at")
     private LocalDateTime deletedAt;
 
-    // ความสัมพันธ์: User เป็นเจ้าของ Warehouse
     @OneToMany(mappedBy = "owner")
     @JsonIgnoreProperties("owner")
     private List<Warehouse> ownedWarehouses;
 
-    public interface UserRepository extends JpaRepository<User, String> {
-        Optional<User> findByUsername(String username);
-        Optional<User> findByEmail(String email);
+    @OneToMany(mappedBy = "user", fetch = FetchType.EAGER)
+    @JsonIgnoreProperties("user")
+    private List<Membership> memberships;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 
     public String getUserId() {
@@ -78,12 +82,20 @@ public class User {
         this.password = password;
     }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
+    public List<Membership> getMemberships() {
+        return memberships;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
+    public void setMemberships(List<Membership> memberships) {
+        this.memberships = memberships;
+    }
+
+    public List<Warehouse> getOwnedWarehouses() {
+        return ownedWarehouses;
+    }
+
+    public void setOwnedWarehouses(List<Warehouse> ownedWarehouses) {
+        this.ownedWarehouses = ownedWarehouses;
     }
 
     public LocalDateTime getUpdatedAt() {
@@ -102,26 +114,11 @@ public class User {
         this.deletedAt = deletedAt;
     }
 
-    public List<Warehouse> getOwnedWarehouses() {
-        return ownedWarehouses;
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
     }
 
-    public void setOwnedWarehouses(List<Warehouse> ownedWarehouses) {
-        this.ownedWarehouses = ownedWarehouses;
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
-
-    @OneToMany(mappedBy = "user", fetch = FetchType.EAGER) // ใช้ EAGER เพื่อให้ดึงทันที
-    @JsonIgnoreProperties("user") // 👈 เปลี่ยนจาก @JsonIgnore เป็นตัวนี้
-    private List<Membership> memberships; // username
 }
